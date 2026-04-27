@@ -1,0 +1,213 @@
+local M = {}
+local utils = require("obsidian-spaced-repetition.utils")
+
+---@class Card
+---@field question string
+---@field answer string
+---@field type "single_line" | "single_line_rev" | "multi_line" | "multi_line_rev"
+---@field file string
+---@field line_start number
+---@field line_end number
+---@field side number 1 or 2 (for reversible cards)
+---@field scheduling table|nil {due_date: string, interval: number, ease: number}
+
+---Find all markdown files in the vault that contain at least one of the flashcard tags
+---@param vault_path string
+---@param tags string[]
+---@return string[]
+function M.find_files_with_tags(vault_path, tags)
+    local files = {}
+    for _, tag in ipairs(tags) do
+        local cmd = string.format('grep -rl "%s" "%s" --include="*.md"', tag, vault_path)
+        local p = io.popen(cmd)
+        if p then
+            for file in p:lines() do
+                files[file] = true
+            end
+            p:close()
+        end
+    end
+    local result = {}
+    for file, _ in pairs(files) do
+        table.insert(result, file)
+    end
+    return result
+end
+
+---Parse a single file for flashcards
+---@param file_path string
+---@return Card[]
+function M.parse_file(file_path)
+    local cards = {}
+    local lines = {}
+    local f = io.open(file_path, "r")
+    if not f then return cards end
+    for line in f:lines() do
+        table.insert(lines, line)
+    end
+    f:close()
+
+    local i = 1
+    while i <= #lines do
+        local line = lines[i]
+        local trimmed = vim.trim(line)
+
+        if vim.startswith(trimmed, "<!--") and not vim.startswith(trimmed, "<!--SR:") then
+            while i <= #lines and not lines[i]:find("-->") do
+                i = i + 1
+            end
+            i = i + 1
+            goto continue
+        end
+
+        -- 1. Single Line Reversible (:::)
+        local q, a = line:match("^(.-)%s*:::%s*(.*)$")
+        if q and a then
+            local sched = nil
+            local line_end = i
+            if i + 1 <= #lines and lines[i+1]:find("<!--SR:") then
+                sched = M.parse_scheduling(lines[i+1])
+                line_end = i + 1
+                i = i + 1
+            end
+            
+            -- Add both sides
+            table.insert(cards, {
+                question = vim.trim(q), answer = vim.trim(a), type = "single_line_rev",
+                file = file_path, line_start = i - (line_end == i and 0 or 1), line_end = line_end, side = 1,
+                scheduling = sched and {sched[1]} or nil
+            })
+            table.insert(cards, {
+                question = vim.trim(a), answer = vim.trim(q), type = "single_line_rev",
+                file = file_path, line_start = i - (line_end == i and 0 or 1), line_end = line_end, side = 2,
+                scheduling = sched and {sched[2]} or nil
+            })
+            goto next_line
+        end
+
+        -- 2. Single Line (::)
+        q, a = line:match("^(.-)%s*::%s*(.*)$")
+        if q and a then
+            local sched = nil
+            local line_end = i
+            if i + 1 <= #lines and lines[i+1]:find("<!--SR:") then
+                sched = M.parse_scheduling(lines[i+1])
+                line_end = i + 1
+                i = i + 1
+            end
+            table.insert(cards, {
+                question = vim.trim(q), answer = vim.trim(a), type = "single_line",
+                file = file_path, line_start = i - (line_end == i and 0 or 1), line_end = line_end, side = 1,
+                scheduling = sched
+            })
+            goto next_line
+        end
+
+        -- 3. Multi Line Reversible (??)
+        if trimmed == "??" then
+            local q_lines = {}
+            local j = i - 1
+            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find("::") and not lines[j]:find("?") do
+                table.insert(q_lines, 1, lines[j])
+                j = j - 1
+            end
+            
+            local a_lines = {}
+            local k = i + 1
+            while k <= #lines and vim.trim(lines[k]) ~= "" and not lines[k]:find("<!--SR:") do
+                table.insert(a_lines, lines[k])
+                k = k + 1
+            end
+
+            if #q_lines > 0 and #a_lines > 0 then
+                local sched = nil
+                local line_end = k - 1
+                if k <= #lines and lines[k]:find("<!--SR:") then
+                    sched = M.parse_scheduling(lines[k])
+                    line_end = k
+                    i = k
+                else
+                    i = k - 1
+                end
+                
+                local q_text = table.concat(q_lines, "\n")
+                local a_text = table.concat(a_lines, "\n")
+                table.insert(cards, {
+                    question = q_text, answer = a_text, type = "multi_line_rev",
+                    file = file_path, line_start = j + 1, line_end = line_end, side = 1,
+                    scheduling = sched and {sched[1]} or nil
+                })
+                table.insert(cards, {
+                    question = a_text, answer = q_text, type = "multi_line_rev",
+                    file = file_path, line_start = j + 1, line_end = line_end, side = 2,
+                    scheduling = sched and {sched[2]} or nil
+                })
+                goto next_line
+            end
+        end
+
+        -- 4. Multi Line (?)
+        if trimmed == "?" then
+            local q_lines = {}
+            local j = i - 1
+            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find("::") and not lines[j]:find("?") do
+                table.insert(q_lines, 1, lines[j])
+                j = j - 1
+            end
+            
+            local a_lines = {}
+            local k = i + 1
+            while k <= #lines and vim.trim(lines[k]) ~= "" and not lines[k]:find("<!--SR:") do
+                table.insert(a_lines, lines[k])
+                k = k + 1
+            end
+
+            if #q_lines > 0 and #a_lines > 0 then
+                local sched = nil
+                local line_end = k - 1
+                if k <= #lines and lines[k]:find("<!--SR:") then
+                    sched = M.parse_scheduling(lines[k])
+                    line_end = k
+                    i = k
+                else
+                    i = k - 1
+                end
+                table.insert(cards, {
+                    question = table.concat(q_lines, "\n"), answer = table.concat(a_lines, "\n"), type = "multi_line",
+                    file = file_path, line_start = j + 1, line_end = line_end, side = 1,
+                    scheduling = sched
+                })
+                goto next_line
+            end
+        end
+
+        ::next_line::
+        i = i + 1
+        ::continue::
+    end
+
+    return cards
+end
+
+---Parse scheduling data from an HTML comment
+---@param line string e.g. "<!--SR:!2023-10-15,3,250-->"
+---@return table|nil List of scheduling data {due_date, interval, ease}
+function M.parse_scheduling(line)
+    local content = line:match("<!--SR:!(.-)-->")
+    if not content then return nil end
+
+    local results = {}
+    for block in content:gmatch("([^!]+)") do
+        local due, ivl, ease = block:match("([^,]+),([^,]+),([^,]+)")
+        if due and ivl and ease then
+            table.insert(results, {
+                due_date = due,
+                interval = tonumber(ivl),
+                ease = tonumber(ease)
+            })
+        end
+    end
+    return results
+end
+
+return M
