@@ -90,8 +90,16 @@ end
 ---Update buffer content safely
 ---@param lines string[]
 local function set_lines(lines)
+    local final_lines = {}
+    for _, line in ipairs(lines) do
+        -- Split any line that contains internal newlines
+        for s in string.gmatch(line .. "\n", "([^\n]*)\n") do
+            table.insert(final_lines, s)
+        end
+    end
+
     vim.bo[state.bufnr].modifiable = true
-    vim.api.nvim_buf_set_lines(state.bufnr, 0, -1, false, lines)
+    vim.api.nvim_buf_set_lines(state.bufnr, 0, -1, false, final_lines)
     vim.bo[state.bufnr].modifiable = false
     -- Reset cursor to top
     vim.api.nvim_win_set_cursor(state.winid, {1, 0})

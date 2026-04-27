@@ -17,17 +17,13 @@ function M.get_decks()
     local tags = config.options.flashcard_tags
     local files = parser.find_files_with_tags(vault_path, tags)
     
-    if #files == 0 then
-        vim.notify("Obsidian SR: No files found with tags: " .. table.concat(tags, ", "), vim.log.levels.DEBUG)
-    end
-
     local decks = {}
     local today = utils.get_today()
 
     for _, file in ipairs(files) do
         local cards = parser.parse_file(file)
         if #cards == 0 then
-            vim.notify("Obsidian SR: No cards parsed in file: " .. file, vim.log.levels.DEBUG)
+            goto continue
         end
 
         local file_content = ""
@@ -38,23 +34,48 @@ function M.get_decks()
         end
 
         local deck_name = "Default"
+        local found_tag = false
+
         for _, tag in ipairs(tags) do
-            -- Look for tag (with or without #)
             local clean_tag = tag:gsub("^#", "")
             local escaped_tag = clean_tag:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
             
-            -- Match #tag/sub or tags: [tag/sub] or tag/sub
-            local pattern = "#?" .. escaped_tag .. "/?([%w%-_/]*)"
-            local sub = file_content:match(pattern)
+            -- Match tag precisely: either #tag or in a list/YAML
+            -- We look for word boundaries or specific delimiters
+            -- Pattern explanation:
+            -- #? : optional hashtag
+            -- escaped_tag : the tag text
+            -- ([/%w%-_/]*) : optional sub-path starting with /
+            -- Then we ensure it's followed by a space, newline, comma, or end of string
+            local pattern = "#?" .. escaped_tag .. "([/%w%-_/]*)"
+            local match_start, match_end, sub = file_content:find(pattern)
             
             if sub then
-                if sub == "" then
-                    deck_name = clean_tag
-                else
-                    deck_name = sub
+                -- Validate that it's a "clean" match (not middle of another word)
+                -- Checking character before match
+                local char_before = match_start > 1 and file_content:sub(match_start-1, match_start-1) or " "
+                local char_after = match_end < #file_content and file_content:sub(match_end+1, match_end+1) or " "
+                
+                local before_ok = char_before:match("[%s%[,%-]") or char_before == "#"
+                local after_ok = char_after:match("[%s%]%,]")
+                
+                if before_ok and after_ok then
+                    if sub == "" then
+                        deck_name = clean_tag
+                    else
+                        if sub:sub(1,1) == "/" then
+                            -- It's a subdeck: tag/subdeck
+                            deck_name = clean_tag .. sub
+                        else
+                            -- It's something else like tag-suffix, ignore if not starting with /
+                            goto next_tag
+                        end
+                    end
+                    found_tag = true
+                    break
                 end
-                break
             end
+            ::next_tag::
         end
 
         if not decks[deck_name] then
@@ -81,6 +102,8 @@ function M.get_decks()
                 end
             end
         end
+
+        ::continue::
     end
     return decks
 end
