@@ -16,15 +16,16 @@ local utils = require("obsidian-spaced-repetition.utils")
 ---@param tags string[]
 ---@return string[]
 function M.find_files_with_tags(vault_path, tags)
+    if vault_path == "" then return {} end
     local files = {}
     for _, tag in ipairs(tags) do
+        -- Use vim.fn.system to get output more reliably in Neovim
         local cmd = string.format('grep -rl "%s" "%s" --include="*.md"', tag, vault_path)
-        local p = io.popen(cmd)
-        if p then
-            for file in p:lines() do
+        local output = vim.fn.system(cmd)
+        if vim.v.shell_error == 0 then
+            for file in output:gmatch("[^\r\n]+") do
                 files[file] = true
             end
-            p:close()
         end
     end
     local result = {}
@@ -33,7 +34,6 @@ function M.find_files_with_tags(vault_path, tags)
     end
     return result
 end
-
 ---Parse a single file for flashcards
 ---@param file_path string
 ---@return Card[]

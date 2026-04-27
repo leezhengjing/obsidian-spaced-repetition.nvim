@@ -17,11 +17,18 @@ function M.get_decks()
     local tags = config.options.flashcard_tags
     local files = parser.find_files_with_tags(vault_path, tags)
     
+    if #files == 0 then
+        vim.notify("Obsidian SR: No files found with tags: " .. table.concat(tags, ", "), vim.log.levels.DEBUG)
+    end
+
     local decks = {}
     local today = utils.get_today()
 
     for _, file in ipairs(files) do
         local cards = parser.parse_file(file)
+        if #cards == 0 then
+            vim.notify("Obsidian SR: No cards parsed in file: " .. file, vim.log.levels.DEBUG)
+        end
         
         -- Try to find the specific tag in the file to determine deck name
         local file_content = ""
