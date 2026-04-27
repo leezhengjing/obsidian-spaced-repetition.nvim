@@ -1,8 +1,6 @@
 # obsidian-spaced-repetition.nvim
 
-A Neovim plugin that brings the power of [Obsidian Spaced Repetition](https://github.com/stefan-adler/obsidian-spaced-repetition) to your favorite terminal editor. Review your Obsidian flashcards directly in Neovim with full compatibility and image support.
-
-![Review UI](https://github.com/leezhengjing/obsidian-spaced-repetition.nvim/raw/master/media/review_ui.png)
+A Neovim plugin that brings the power of [Obsidian Spaced Repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition) to your favorite terminal editor. Review your Obsidian flashcards directly in Neovim with full compatibility and image support.
 
 ## ✨ Features
 
