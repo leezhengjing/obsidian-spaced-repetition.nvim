@@ -33,32 +33,53 @@ function M.add_days(date_str, days)
     return os.date("%Y-%m-%d", t)
 end
 
+---Calculate difference in days between two dates
+---@param date1 string YYYY-MM-DD
+---@param date2 string YYYY-MM-DD
+---@return number
+function M.date_diff(date1, date2)
+    local y1, m1, d1 = date1:match("(%d+)-(%d+)-(%d+)")
+    local y2, m2, d2 = date2:match("(%d+)-(%d+)-(%d+)")
+    if not y1 or not y2 then return 0 end
+    local t1 = os.time({ year = y1, month = m1, day = d1 })
+    local t2 = os.time({ year = y2, month = m2, day = d2 })
+    return math.floor(os.difftime(t1, t2) / (24 * 60 * 60))
+end
+
 ---Resolve an Obsidian image path to an absolute path
 ---@param vault_path string
 ---@param current_file string
 ---@param link_text string e.g. "Pasted image 123.png" or "path/to/img.png"
 ---@return string|nil
 function M.resolve_image_path(vault_path, current_file, link_text)
+    -- Remove any Obsidian-style alias/size info (e.g. [[image.png|100]])
+    local parts = vim.split(link_text, "|")
+    local clean_link = parts[1]
+
     -- 1. Check if it's an absolute path already
-    if link_text:sub(1, 1) == "/" then
-        if vim.fn.filereadable(link_text) == 1 then return link_text end
+    if clean_link:sub(1, 1) == "/" then
+        if vim.fn.filereadable(clean_link) == 1 then return clean_link end
     end
 
     -- 2. Check relative to current file
     local current_dir = current_file:match("(.*)/")
     if current_dir then
-        local rel_path = current_dir .. "/" .. link_text
+        local rel_path = current_dir .. "/" .. clean_link
         if vim.fn.filereadable(rel_path) == 1 then return rel_path end
     end
 
-    -- 3. Search in the whole vault (Obsidian's default behavior for [[links]])
-    -- We can use find or just check if it's a simple filename
-    local cmd = string.format('find "%s" -name "%s"', vault_path, link_text)
+    -- 3. Check relative to vault root
+    local vault_rel_path = vault_path .. "/" .. clean_link
+    if vim.fn.filereadable(vault_rel_path) == 1 then return vault_rel_path end
+
+    -- 4. Search in the whole vault for the filename (Obsidian's fallback)
+    local filename = clean_link:match("([^/]+)$") or clean_link
+    local cmd = string.format('find "%s" -name "%s" | head -n 1', vault_path, filename)
     local p = io.popen(cmd)
     if p then
-        local first_match = p:read("*l")
+        local match = p:read("*l")
         p:close()
-        if first_match then return first_match end
+        if match then return match end
     end
 
     return nil

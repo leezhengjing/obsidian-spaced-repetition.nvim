@@ -91,7 +91,7 @@ end
 ---Clear all rendered images
 local function clear_images()
     for _, img in ipairs(state.rendered_images) do
-        img:clear()
+        pcall(function() img:clear() end)
     end
     state.rendered_images = {}
 end
@@ -117,8 +117,6 @@ local function render_images(lines)
                     y = line_idx - 1,
                     x = 0,
                     with_virtual_padding = true,
-                    max_width_window_percentage = 80,
-                    max_height_window_percentage = 50,
                 })
                 if img then
                     img:render()
@@ -126,9 +124,9 @@ local function render_images(lines)
                 end
             end
         end
-        -- 2. Match ![](path/to/img.png)
-        for link in line:gmatch("!%[(.-)%]%((.-)%)") do
-            local path = utils.resolve_image_path(vault_path, card.file, link)
+        -- 2. Match ![alt](path/to/img.png)
+        for _, img_path in line:gmatch("!%[(.-)%]%((.-)%)") do
+            local path = utils.resolve_image_path(vault_path, card.file, img_path)
             if path then
                 local img = image_api.from_file(path, {
                     window = state.winid,
@@ -136,8 +134,6 @@ local function render_images(lines)
                     y = line_idx - 1,
                     x = 0,
                     with_virtual_padding = true,
-                    max_width_window_percentage = 80,
-                    max_height_window_percentage = 50,
                 })
                 if img then
                     img:render()
@@ -170,7 +166,7 @@ local function set_lines(lines)
         if state.winid and vim.api.nvim_win_is_valid(state.winid) then
             render_images(final_lines)
         end
-    end, 50)
+    end, 100)
 end
 
 ---Display current card's question
