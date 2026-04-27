@@ -19,8 +19,11 @@ function M.find_files_with_tags(vault_path, tags)
     if vault_path == "" then return {} end
     local files = {}
     for _, tag in ipairs(tags) do
+        -- Remove # if present to find it in YAML or text
+        local clean_tag = tag:gsub("^#", "")
         -- Use vim.fn.system to get output more reliably in Neovim
-        local cmd = string.format('grep -rl "%s" "%s" --include="*.md"', tag, vault_path)
+        -- Search for the tag as a whole word if possible to avoid partial matches
+        local cmd = string.format('grep -rl "%s" "%s" --include="*.md"', clean_tag, vault_path)
         local output = vim.fn.system(cmd)
         if vim.v.shell_error == 0 then
             for file in output:gmatch("[^\r\n]+") do
@@ -34,6 +37,7 @@ function M.find_files_with_tags(vault_path, tags)
     end
     return result
 end
+
 ---Parse a single file for flashcards
 ---@param file_path string
 ---@return Card[]

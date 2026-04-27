@@ -68,17 +68,33 @@ function M.create_window()
         title_pos = "center",
     })
 
-    vim.api.nvim_buf_set_option(state.bufnr, "filetype", "markdown")
-    vim.api.nvim_buf_set_option(state.bufnr, "buftype", "nofile")
+    vim.bo[state.bufnr].filetype = "markdown"
+    vim.bo[state.bufnr].buftype = "nofile"
+    vim.bo[state.bufnr].modifiable = true
     
     -- Mappings
-    local opts = { buffer = state.bufnr, nowait = true }
+    local opts = { buffer = state.bufnr, nowait = true, silent = true }
     vim.keymap.set("n", "<Space>", M.toggle_answer, opts)
+    vim.keymap.set("n", "<CR>", M.toggle_answer, opts)
     vim.keymap.set("n", "1", function() M.score(sm2.Response.AGAIN) end, opts)
     vim.keymap.set("n", "2", function() M.score(sm2.Response.HARD) end, opts)
     vim.keymap.set("n", "3", function() M.score(sm2.Response.GOOD) end, opts)
     vim.keymap.set("n", "4", function() M.score(sm2.Response.EASY) end, opts)
     vim.keymap.set("n", "q", M.close, opts)
+    vim.keymap.set("n", "<Esc>", M.close, opts)
+    
+    -- Ensure window is focused
+    vim.api.nvim_set_current_win(state.winid)
+end
+
+---Update buffer content safely
+---@param lines string[]
+local function set_lines(lines)
+    vim.bo[state.bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(state.bufnr, 0, -1, false, lines)
+    vim.bo[state.bufnr].modifiable = false
+    -- Reset cursor to top
+    vim.api.nvim_win_set_cursor(state.winid, {1, 0})
 end
 
 ---Display current card's question
@@ -92,9 +108,9 @@ function M.show_card()
         card.question,
         "",
         "---",
-        "(Press <Space> to show answer, 'q' to quit)"
+        "(Press <Space> or <CR> to show answer, 'q' to quit)"
     }
-    vim.api.nvim_buf_set_lines(state.bufnr, 0, -1, false, content)
+    set_lines(content)
 end
 
 ---Display current card's answer
@@ -116,7 +132,7 @@ function M.toggle_answer()
         "---",
         "Score: 1: Again, 2: Hard, 3: Good, 4: Easy"
     }
-    vim.api.nvim_buf_set_lines(state.bufnr, 0, -1, false, content)
+    set_lines(content)
 end
 
 ---Record score for current card and proceed
@@ -125,7 +141,6 @@ function M.score(response)
     if not state.showing_answer then return end
     
     local card = state.cards_to_review[state.current_index]
-    -- Update SM-2 logic and write back to file
     require("obsidian-spaced-repetition.writer").update_card(card, response)
 
     state.current_index = state.current_index + 1

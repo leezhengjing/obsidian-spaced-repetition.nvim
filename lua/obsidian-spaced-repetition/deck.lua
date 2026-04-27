@@ -29,8 +29,7 @@ function M.get_decks()
         if #cards == 0 then
             vim.notify("Obsidian SR: No cards parsed in file: " .. file, vim.log.levels.DEBUG)
         end
-        
-        -- Try to find the specific tag in the file to determine deck name
+
         local file_content = ""
         local f = io.open(file, "r")
         if f then
@@ -40,14 +39,17 @@ function M.get_decks()
 
         local deck_name = "Default"
         for _, tag in ipairs(tags) do
-            -- Look for #tag/subdeck or #tag
-            -- Escape tag for pattern
-            local escaped_tag = tag:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
-            local pattern = escaped_tag .. "/?([%w%-_/]*)"
+            -- Look for tag (with or without #)
+            local clean_tag = tag:gsub("^#", "")
+            local escaped_tag = clean_tag:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
+            
+            -- Match #tag/sub or tags: [tag/sub] or tag/sub
+            local pattern = "#?" .. escaped_tag .. "/?([%w%-_/]*)"
             local sub = file_content:match(pattern)
+            
             if sub then
                 if sub == "" then
-                    deck_name = tag:sub(2) -- remove #
+                    deck_name = clean_tag
                 else
                     deck_name = sub
                 end
