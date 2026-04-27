@@ -49,10 +49,11 @@ function M.show_decks()
         sorter = conf.generic_sorter({}),
         attach_mappings = function(prompt_bufnr, map)
             actions.select_default:replace(function()
-                actions.close(prompt_bufnr)
                 local selection = action_state.get_selected_entry()
-                -- review_ui will be implemented next
-                require("obsidian-spaced-repetition.ui.review").start_review(selection.value)
+                actions.close(prompt_bufnr)
+                if selection then
+                    require("obsidian-spaced-repetition.ui.review").start_review(selection.value)
+                end
             end)
             return true
         end,
