@@ -81,6 +81,8 @@ function M.create_window()
     vim.keymap.set("n", "2", function() M.score(sm2.Response.HARD) end, opts)
     vim.keymap.set("n", "3", function() M.score(sm2.Response.GOOD) end, opts)
     vim.keymap.set("n", "4", function() M.score(sm2.Response.EASY) end, opts)
+    vim.keymap.set("n", "s", M.skip, opts)
+    vim.keymap.set("n", "e", M.edit_source, opts)
     vim.keymap.set("n", "q", M.close, opts)
     vim.keymap.set("n", "<Esc>", M.close, opts)
     
@@ -170,7 +172,7 @@ local function set_lines(lines)
         if state.winid and vim.api.nvim_win_is_valid(state.winid) then
             render_images(final_lines)
         end
-    end, 200) -- Increased delay to 200ms
+    end, 200)
 end
 
 ---Display current card's question
@@ -184,7 +186,7 @@ function M.show_card()
         card.question,
         "",
         "---",
-        "(Press <Space> or <CR> to show answer, 'q' to quit)"
+        "Controls: <Space>/<CR>: Show Answer | s: Skip | e: Edit | q: Quit"
     }
     set_lines(content)
 end
@@ -206,7 +208,7 @@ function M.toggle_answer()
         card.answer,
         "",
         "---",
-        "Score: 1: Again, 2: Hard, 3: Good, 4: Easy"
+        "Score: 1: Again | 2: Hard | 3: Good | 4: Easy | s: Skip | e: Edit"
     }
     set_lines(content)
 end
@@ -219,6 +221,16 @@ function M.score(response)
     local card = state.cards_to_review[state.current_index]
     require("obsidian-spaced-repetition.writer").update_card(card, response)
 
+    M.next_card()
+end
+
+---Skip current card
+function M.skip()
+    M.next_card()
+end
+
+---Move to next card or finish session
+function M.next_card()
     state.current_index = state.current_index + 1
     if state.current_index > #state.cards_to_review then
         vim.notify("Review complete!", vim.log.levels.INFO)
@@ -226,6 +238,17 @@ function M.score(response)
     else
         M.show_card()
     end
+end
+
+---Open the source file of the current card
+function M.edit_source()
+    local card = state.cards_to_review[state.current_index]
+    local file = card.file
+    local line = card.line_start
+    
+    M.close()
+    vim.cmd("edit " .. vim.fn.fnameescape(file))
+    vim.api.nvim_win_set_cursor(0, {line, 0})
 end
 
 ---Close review window
