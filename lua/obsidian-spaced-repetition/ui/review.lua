@@ -117,6 +117,8 @@ local function render_images(lines)
                     y = line_idx - 1,
                     x = 0,
                     with_virtual_padding = true,
+                    max_width_window_percentage = 80,
+                    max_height_window_percentage = 50,
                 })
                 if img then
                     img:render()
@@ -134,6 +136,8 @@ local function render_images(lines)
                     y = line_idx - 1,
                     x = 0,
                     with_virtual_padding = true,
+                    max_width_window_percentage = 80,
+                    max_height_window_percentage = 50,
                 })
                 if img then
                     img:render()
@@ -166,7 +170,7 @@ local function set_lines(lines)
         if state.winid and vim.api.nvim_win_is_valid(state.winid) then
             render_images(final_lines)
         end
-    end, 100)
+    end, 200) -- Increased delay to 200ms
 end
 
 ---Display current card's question

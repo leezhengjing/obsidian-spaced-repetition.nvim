@@ -55,6 +55,9 @@ function M.resolve_image_path(vault_path, current_file, link_text)
     -- Remove any Obsidian-style alias/size info (e.g. [[image.png|100]])
     local parts = vim.split(link_text, "|")
     local clean_link = parts[1]
+    
+    -- Remove any Markdown title info (e.g. [alt](path "title"))
+    clean_link = clean_link:match("^%s*([^%s]+)") or clean_link
 
     -- 1. Check if it's an absolute path already
     if clean_link:sub(1, 1) == "/" then
@@ -62,11 +65,9 @@ function M.resolve_image_path(vault_path, current_file, link_text)
     end
 
     -- 2. Check relative to current file
-    local current_dir = current_file:match("(.*)/")
-    if current_dir then
-        local rel_path = current_dir .. "/" .. clean_link
-        if vim.fn.filereadable(rel_path) == 1 then return rel_path end
-    end
+    local current_dir = current_file:match("(.*)/") or "."
+    local rel_path = current_dir .. "/" .. clean_link
+    if vim.fn.filereadable(rel_path) == 1 then return rel_path end
 
     -- 3. Check relative to vault root
     local vault_rel_path = vault_path .. "/" .. clean_link
