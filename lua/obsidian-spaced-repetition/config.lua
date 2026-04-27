@@ -17,6 +17,11 @@ M.defaults = {
     hard_delay = 1,
     good_delay_multiplier = 2.5,
     easy_delay_multiplier = 3.5,
+    -- Separators
+    single_line_separator = ":::",
+    single_line_reversed_separator = "::::",
+    multiline_separator = "?",
+    multiline_reversed_separator = "??",
 }
 
 M.options = {}

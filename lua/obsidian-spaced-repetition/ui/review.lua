@@ -10,6 +10,7 @@ local state = {
     bufnr = nil,
     winid = nil,
     showing_answer = false,
+    rendered_images = {},
 }
 
 ---Start a review session for a deck
@@ -87,6 +88,66 @@ function M.create_window()
     vim.api.nvim_set_current_win(state.winid)
 end
 
+---Clear all rendered images
+local function clear_images()
+    for _, img in ipairs(state.rendered_images) do
+        img:clear()
+    end
+    state.rendered_images = {}
+end
+
+---Render images found in lines
+---@param lines string[]
+local function render_images(lines)
+    local has_image_nvim, image_api = pcall(require, "image")
+    if not has_image_nvim then return end
+
+    clear_images()
+    local vault_path = config.options.vault_path
+    local card = state.cards_to_review[state.current_index]
+
+    for line_idx, line in ipairs(lines) do
+        -- 1. Match ![[Image.png]]
+        for link in line:gmatch("!%[%[(.-)%]%]") do
+            local path = utils.resolve_image_path(vault_path, card.file, link)
+            if path then
+                local img = image_api.from_file(path, {
+                    window = state.winid,
+                    buffer = state.bufnr,
+                    y = line_idx - 1,
+                    x = 0,
+                    with_virtual_padding = true,
+                    max_width_window_percentage = 80,
+                    max_height_window_percentage = 50,
+                })
+                if img then
+                    img:render()
+                    table.insert(state.rendered_images, img)
+                end
+            end
+        end
+        -- 2. Match ![](path/to/img.png)
+        for link in line:gmatch("!%[(.-)%]%((.-)%)") do
+            local path = utils.resolve_image_path(vault_path, card.file, link)
+            if path then
+                local img = image_api.from_file(path, {
+                    window = state.winid,
+                    buffer = state.bufnr,
+                    y = line_idx - 1,
+                    x = 0,
+                    with_virtual_padding = true,
+                    max_width_window_percentage = 80,
+                    max_height_window_percentage = 50,
+                })
+                if img then
+                    img:render()
+                    table.insert(state.rendered_images, img)
+                end
+            end
+        end
+    end
+end
+
 ---Update buffer content safely
 ---@param lines string[]
 local function set_lines(lines)
@@ -103,6 +164,13 @@ local function set_lines(lines)
     vim.bo[state.bufnr].modifiable = false
     -- Reset cursor to top
     vim.api.nvim_win_set_cursor(state.winid, {1, 0})
+    
+    -- Defer image rendering slightly to ensure buffer is ready
+    vim.defer_fn(function()
+        if state.winid and vim.api.nvim_win_is_valid(state.winid) then
+            render_images(final_lines)
+        end
+    end, 50)
 end
 
 ---Display current card's question
@@ -162,6 +230,7 @@ end
 
 ---Close review window
 function M.close()
+    clear_images()
     if state.winid and vim.api.nvim_win_is_valid(state.winid) then
         vim.api.nvim_win_close(state.winid, true)
     end

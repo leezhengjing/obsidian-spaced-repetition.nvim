@@ -1,5 +1,6 @@
 local M = {}
 local utils = require("obsidian-spaced-repetition.utils")
+local config = require("obsidian-spaced-repetition.config")
 
 ---@class Card
 ---@field question string
@@ -19,10 +20,7 @@ function M.find_files_with_tags(vault_path, tags)
     if vault_path == "" then return {} end
     local files = {}
     for _, tag in ipairs(tags) do
-        -- Remove # if present to find it in YAML or text
         local clean_tag = tag:gsub("^#", "")
-        -- Use vim.fn.system to get output more reliably in Neovim
-        -- Search for the tag as a whole word if possible to avoid partial matches
         local cmd = string.format('grep -rl "%s" "%s" --include="*.md"', clean_tag, vault_path)
         local output = vim.fn.system(cmd)
         if vim.v.shell_error == 0 then
@@ -51,6 +49,17 @@ function M.parse_file(file_path)
     end
     f:close()
 
+    local opts = config.options
+    local s_sl = opts.single_line_separator or ":::"
+    local s_slr = opts.single_line_reversed_separator or "::::"
+    local s_ml = opts.multiline_separator or "?"
+    local s_mlr = opts.multiline_reversed_separator or "??"
+
+    -- Escape for patterns
+    local function esc(s) return s:gsub("([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1") end
+    local p_slr = "^(.-)%s*" .. esc(s_slr) .. "%s*(.*)$"
+    local p_sl = "^(.-)%s*" .. esc(s_sl) .. "%s*(.*)$"
+
     local i = 1
     while i <= #lines do
         local line = lines[i]
@@ -64,8 +73,8 @@ function M.parse_file(file_path)
             goto continue
         end
 
-        -- 1. Single Line Reversible (:::)
-        local q, a = line:match("^(.-)%s*:::%s*(.*)$")
+        -- 1. Single Line Reversible
+        local q, a = line:match(p_slr)
         if q and a then
             local sched = nil
             local line_end = i
@@ -74,8 +83,6 @@ function M.parse_file(file_path)
                 line_end = i + 1
                 i = i + 1
             end
-            
-            -- Add both sides
             table.insert(cards, {
                 question = vim.trim(q), answer = vim.trim(a), type = "single_line_rev",
                 file = file_path, line_start = i - (line_end == i and 0 or 1), line_end = line_end, side = 1,
@@ -89,8 +96,8 @@ function M.parse_file(file_path)
             goto next_line
         end
 
-        -- 2. Single Line (::)
-        q, a = line:match("^(.-)%s*::%s*(.*)$")
+        -- 2. Single Line Basic
+        q, a = line:match(p_sl)
         if q and a then
             local sched = nil
             local line_end = i
@@ -107,22 +114,20 @@ function M.parse_file(file_path)
             goto next_line
         end
 
-        -- 3. Multi Line Reversible (??)
-        if trimmed == "??" then
+        -- 3. Multi Line Reversible
+        if trimmed == s_mlr then
             local q_lines = {}
             local j = i - 1
-            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find("::") and not lines[j]:find("?") do
+            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find(esc(s_sl)) and not lines[j]:find(esc(s_ml)) do
                 table.insert(q_lines, 1, lines[j])
                 j = j - 1
             end
-            
             local a_lines = {}
             local k = i + 1
             while k <= #lines and vim.trim(lines[k]) ~= "" and not lines[k]:find("<!--SR:") do
                 table.insert(a_lines, lines[k])
                 k = k + 1
             end
-
             if #q_lines > 0 and #a_lines > 0 then
                 local sched = nil
                 local line_end = k - 1
@@ -133,7 +138,6 @@ function M.parse_file(file_path)
                 else
                     i = k - 1
                 end
-                
                 local q_text = table.concat(q_lines, "\n")
                 local a_text = table.concat(a_lines, "\n")
                 table.insert(cards, {
@@ -150,22 +154,20 @@ function M.parse_file(file_path)
             end
         end
 
-        -- 4. Multi Line (?)
-        if trimmed == "?" then
+        -- 4. Multi Line Basic
+        if trimmed == s_ml then
             local q_lines = {}
             local j = i - 1
-            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find("::") and not lines[j]:find("?") do
+            while j >= 1 and vim.trim(lines[j]) ~= "" and not lines[j]:find(esc(s_sl)) and not lines[j]:find(esc(s_ml)) do
                 table.insert(q_lines, 1, lines[j])
                 j = j - 1
             end
-            
             local a_lines = {}
             local k = i + 1
             while k <= #lines and vim.trim(lines[k]) ~= "" and not lines[k]:find("<!--SR:") do
                 table.insert(a_lines, lines[k])
                 k = k + 1
             end
-
             if #q_lines > 0 and #a_lines > 0 then
                 local sched = nil
                 local line_end = k - 1
@@ -189,7 +191,6 @@ function M.parse_file(file_path)
         i = i + 1
         ::continue::
     end
-
     return cards
 end
 
@@ -199,7 +200,6 @@ end
 function M.parse_scheduling(line)
     local content = line:match("<!--SR:!(.-)-->")
     if not content then return nil end
-
     local results = {}
     for block in content:gmatch("([^!]+)") do
         local due, ivl, ease = block:match("([^,]+),([^,]+),([^,]+)")

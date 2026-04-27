@@ -33,17 +33,35 @@ function M.add_days(date_str, days)
     return os.date("%Y-%m-%d", t)
 end
 
----Calculate difference in days between two dates
----@param date1 string YYYY-MM-DD
----@param date2 string YYYY-MM-DD
----@return number
-function M.date_diff(date1, date2)
-    local y1, m1, d1 = date1:match("(%d+)-(%d+)-(%d+)")
-    local y2, m2, d2 = date2:match("(%d+)-(%d+)-(%d+)")
-    if not y1 or not y2 then return 0 end
-    local t1 = os.time({ year = y1, month = m1, day = d1 })
-    local t2 = os.time({ year = y2, month = m2, day = d2 })
-    return math.floor(os.difftime(t1, t2) / (24 * 60 * 60))
+---Resolve an Obsidian image path to an absolute path
+---@param vault_path string
+---@param current_file string
+---@param link_text string e.g. "Pasted image 123.png" or "path/to/img.png"
+---@return string|nil
+function M.resolve_image_path(vault_path, current_file, link_text)
+    -- 1. Check if it's an absolute path already
+    if link_text:sub(1, 1) == "/" then
+        if vim.fn.filereadable(link_text) == 1 then return link_text end
+    end
+
+    -- 2. Check relative to current file
+    local current_dir = current_file:match("(.*)/")
+    if current_dir then
+        local rel_path = current_dir .. "/" .. link_text
+        if vim.fn.filereadable(rel_path) == 1 then return rel_path end
+    end
+
+    -- 3. Search in the whole vault (Obsidian's default behavior for [[links]])
+    -- We can use find or just check if it's a simple filename
+    local cmd = string.format('find "%s" -name "%s"', vault_path, link_text)
+    local p = io.popen(cmd)
+    if p then
+        local first_match = p:read("*l")
+        p:close()
+        if first_match then return first_match end
+    end
+
+    return nil
 end
 
 return M
