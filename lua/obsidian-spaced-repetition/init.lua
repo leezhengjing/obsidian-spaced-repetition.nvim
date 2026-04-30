@@ -19,23 +19,7 @@ function M.review_note(review_all)
         return
     end
 
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    local cards = require("obsidian-spaced-repetition.parser").parse_lines(lines, file_path)
-    
-    if #cards == 0 then
-        vim.notify("No flashcards found in this note!", vim.log.levels.INFO)
-        return
-    end
-
-    local file_content = table.concat(lines, "\n")
-    local deck_name = require("obsidian-spaced-repetition.deck").get_deck_name(file_content)
-    
-    local deck = {
-        name = deck_name .. " (Note)",
-        cards = cards
-    }
-
-    require("obsidian-spaced-repetition.ui.review").start_review(deck, review_all)
+    require("obsidian-spaced-repetition.ui.picker").show_decks(file_path, review_all)
 end
 
 ---Review all flashcards in the current buffer (bypass due date)

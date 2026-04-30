@@ -50,11 +50,12 @@ function M.get_deck_name(file_content)
 end
 
 ---Get all decks and their statistics
+---@param filter_file string|nil Optional file path to filter results to a single note
 ---@return table<string, Deck>
-function M.get_decks()
+function M.get_decks(filter_file)
     local vault_path = config.options.vault_path
     local tags = config.options.flashcard_tags
-    local files = parser.find_files_with_tags(vault_path, tags)
+    local files = filter_file and { filter_file } or parser.find_files_with_tags(vault_path, tags)
     
     local decks = {}
     local today = utils.get_today()
