@@ -40,15 +40,23 @@ end
 ---@param file_path string
 ---@return Card[]
 function M.parse_file(file_path)
-    local cards = {}
     local lines = {}
     local f = io.open(file_path, "r")
-    if not f then return cards end
+    if not f then return {} end
     for line in f:lines() do
         table.insert(lines, line)
     end
     f:close()
 
+    return M.parse_lines(lines, file_path)
+end
+
+---Parse lines for flashcards
+---@param lines string[]
+---@param file_path string
+---@return Card[]
+function M.parse_lines(lines, file_path)
+    local cards = {}
     local opts = config.options
     local s_sl = opts.single_line_separator or ":::"
     local s_slr = opts.single_line_reversed_separator or "::::"
@@ -193,6 +201,7 @@ function M.parse_file(file_path)
     end
     return cards
 end
+
 
 ---Parse scheduling data from an HTML comment
 ---@param line string e.g. "<!--SR:!2023-10-15,3,250-->"

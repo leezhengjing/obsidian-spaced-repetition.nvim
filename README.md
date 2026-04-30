@@ -37,9 +37,17 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
     end,
     keys = {
         { "<leader>or", "<cmd>ObsidianSRReview<cr>", desc = "Obsidian Spaced Repetition Review" },
+        { "<leader>on", "<cmd>ObsidianSRReviewNote<cr>", desc = "Review flashcards in current note" },
+        { "<leader>oN", "<cmd>ObsidianSRReviewNoteAll<cr>", desc = "Review ALL flashcards in current note" },
     },
 }
 ```
+
+## 🛠️ Commands
+
+- `:ObsidianSRReview` - Open a Telescope picker to browse and review decks.
+- `:ObsidianSRReviewNote` - Review due flashcards in the currently open markdown file.
+- `:ObsidianSRReviewNoteAll` - Review *all* flashcards in the currently open markdown file, ignoring due dates.
 
 ## 🛠️ Configuration
 

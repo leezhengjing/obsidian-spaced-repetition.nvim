@@ -15,7 +15,8 @@ local state = {
 
 ---Start a review session for a deck
 ---@param deck table
-function M.start_review(deck)
+---@param review_all boolean|nil
+function M.start_review(deck, review_all)
     state.deck = deck
     state.cards_to_review = {}
     local today = utils.get_today()
@@ -23,7 +24,9 @@ function M.start_review(deck)
     -- Filter Due cards
     for _, card in ipairs(deck.cards) do
         local is_due = false
-        if card.scheduling and #card.scheduling > 0 then
+        if review_all then
+            is_due = true
+        elseif card.scheduling and #card.scheduling > 0 then
             for _, s in ipairs(card.scheduling) do
                 if s.due_date <= today then
                     is_due = true
